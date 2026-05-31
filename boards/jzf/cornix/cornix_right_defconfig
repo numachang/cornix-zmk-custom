@@ -28,7 +28,11 @@ CONFIG_ZMK_SPLIT=y
 CONFIG_ZMK_BLE=y
 
 # never output usb
-CONFIG_ZMK_USB=n
+# DIAG (diag/battery-vddh-probe): temporarily enable USB so the right half also
+# gets a USB CDC console for the charge-STAT probe (read in Tera Term on the
+# right's own USB-C). Restore to =n to revert. NOTE: with USB on, the right
+# also enumerates as a USB HID device — expected for this diag only.
+CONFIG_ZMK_USB=y
 
 CONFIG_INPUT=y
 

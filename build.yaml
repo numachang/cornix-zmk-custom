@@ -44,7 +44,12 @@ include:
 
   - board: cornix_right
     shield: cornix_indicator
-    artifact-name: cornix_right_nosd
+    # DIAG (diag/battery-vddh-probe): add zmk-usb-logging so the right half also
+    # exposes a USB CDC console for the charge-STAT probe (Tera Term on the right's
+    # USB-C). Pairs with CONFIG_ZMK_USB=y in cornix_right_defconfig (diag override).
+    # Restore by removing the snippet line and the artifact rename to revert.
+    snippet: zmk-usb-logging nrf52840-nosd
+    artifact-name: cornix_right_vddhprobe_nosd
 
   - board: cornix_right
     shield: settings_reset
