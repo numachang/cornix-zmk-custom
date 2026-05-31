@@ -30,12 +30,13 @@ include:
   #   artifact-name: cornix_dongle_zds_nano
   - board: cornix_left
     shield: cornix_indicator
-    # DIAG (diag/battery-vddh-probe): swapped studio-rpc-usb-uart -> zmk-usb-logging
-    # so the battery driver's mV reading prints over USB CDC (read in Tera Term).
-    # Studio is disabled on this diag build by design. Restore the line below to revert:
+    # DIAG (diag/14-reconnect-heartbeat): zmk-usb-logging (not studio) so the
+    # left central streams its log over USB CDC -- capture it in Tera Term
+    # alongside the right half. Studio is disabled on this diag build by design.
+    # Restore the line below to revert:
     #   snippet: studio-rpc-usb-uart nrf52840-nosd
     snippet: zmk-usb-logging nrf52840-nosd
-    artifact-name: cornix_left_vddhprobe_nosd
+    artifact-name: cornix_left_hb14_nosd
 
   # Dongle target disabled (see above).
   # - board: cornix_ph_left
@@ -44,12 +45,12 @@ include:
 
   - board: cornix_right
     shield: cornix_indicator
-    # DIAG (diag/battery-vddh-probe): add zmk-usb-logging so the right half also
-    # exposes a USB CDC console for the charge-STAT probe (Tera Term on the right's
-    # USB-C). Pairs with CONFIG_ZMK_USB=y in cornix_right_defconfig (diag override).
-    # Restore by removing the snippet line and the artifact rename to revert.
+    # DIAG (diag/14-reconnect-heartbeat): zmk-usb-logging + CONFIG_ZMK_USB=y
+    # (cornix_right_defconfig diag override) so the right peripheral also exposes
+    # a USB CDC console. This is the half under study: watch its heartbeats after
+    # the left central loses power. Restore by removing the snippet + override.
     snippet: zmk-usb-logging nrf52840-nosd
-    artifact-name: cornix_right_vddhprobe_nosd
+    artifact-name: cornix_right_hb14_nosd
 
   - board: cornix_right
     shield: settings_reset
