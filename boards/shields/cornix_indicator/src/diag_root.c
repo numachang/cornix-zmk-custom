@@ -36,6 +36,7 @@
 #include <zephyr/drivers/watchdog.h>
 #include <zephyr/drivers/hwinfo.h>
 #include <zephyr/sys/reboot.h>
+#include <zephyr/fatal.h>
 #include <string.h>
 
 LOG_MODULE_REGISTER(diag_root, LOG_LEVEL_INF);
@@ -63,6 +64,35 @@ void bt_ctlr_assert_handle(char *file, uint32_t line) {
         }
     }
     crash.file[i] = '\0';
+    sys_reboot(SYS_REBOOT_COLD);
+    for (;;) {
+        /* unreachable */
+    }
+}
+
+/* --- fatal-error sink (experiment B): CONFIG_BT_ASSERT is on by default, so a
+ * violated controller LL_ASSERT does printk()+k_oops() rather than nothing. If
+ * the #14 freeze is actually such an oops in the radio ISR (its printk never
+ * flushing over USB), this captures WHERE: override the kernel fatal handler to
+ * stash the faulting PC/LR into __noinit RAM (survives the warm reboot; lost only
+ * on real power-off, so keep the RIGHT half powered) and cold-reboot. The next
+ * boot prints the PC, which maps to a controller function/line via the .elf.
+ * If instead the freeze is a pure irq-locked spin, no fatal fires -> the WDT
+ * recovers it and the report shows reset_cause=WDT with no PC. --- */
+#define FATAL_MAGIC 0x4641544Cu /* 'FATL' */
+struct fatal_info {
+    uint32_t magic;
+    uint32_t reason;
+    uint32_t pc;
+    uint32_t lr;
+};
+static __noinit struct fatal_info fatal;
+
+void k_sys_fatal_error_handler(unsigned int reason, const struct arch_esf *esf) {
+    fatal.magic = FATAL_MAGIC;
+    fatal.reason = reason;
+    fatal.pc = (esf != NULL) ? esf->basic.pc : 0u;
+    fatal.lr = (esf != NULL) ? esf->basic.lr : 0u;
     sys_reboot(SYS_REBOOT_COLD);
     for (;;) {
         /* unreachable */
@@ -97,6 +127,10 @@ static uint32_t boot_cause;
 static bool boot_had_assert;
 static uint32_t boot_assert_line;
 static char boot_assert_file[sizeof(crash.file)];
+static bool boot_had_fatal;
+static uint32_t boot_fatal_reason;
+static uint32_t boot_fatal_pc;
+static uint32_t boot_fatal_lr;
 static int report_n;
 
 static void report_handler(struct k_work *work);
@@ -108,13 +142,17 @@ static void report_handler(struct k_work *work) {
             boot_cause, (boot_cause & RESET_POR) ? "POR " : "",
             (boot_cause & RESET_PIN) ? "PIN " : "", (boot_cause & RESET_SOFTWARE) ? "SOFT " : "",
             (boot_cause & RESET_WATCHDOG) ? "WDT " : "");
+    if (boot_had_fatal) {
+        LOG_ERR(">>> PREV FATAL reason=%u pc=0x%08x lr=0x%08x <<< (addr2line this pc on zephyr.elf = ROOT CAUSE)",
+                boot_fatal_reason, boot_fatal_pc, boot_fatal_lr);
+    }
     if (boot_had_assert) {
         LOG_ERR(">>> PREV LL_ASSERT @ %s:%u <<< (controller invariant violated -- ROOT CAUSE)",
                 boot_assert_file, boot_assert_line);
-    } else if (boot_cause & RESET_WATCHDOG) {
-        LOG_ERR(">>> PREV BOOT: WATCHDOG reset, NO LL_ASSERT = silent hard hang (irq-locked) <<<");
-    } else {
-        LOG_INF("(prev boot was clean: no LL_ASSERT, no watchdog)");
+    } else if (!boot_had_fatal && (boot_cause & RESET_WATCHDOG)) {
+        LOG_ERR(">>> PREV BOOT: WATCHDOG reset, NO FATAL/LL_ASSERT = pure irq-locked spin <<<");
+    } else if (!boot_had_fatal) {
+        LOG_INF("(prev boot was clean: no fatal, no LL_ASSERT, no watchdog)");
     }
     if (++report_n < 5) {
         k_work_reschedule(&report_work, K_SECONDS(2));
@@ -130,6 +168,13 @@ static int diag_root_init(void) {
         (void)strncpy(boot_assert_file, crash.file, sizeof(boot_assert_file) - 1U);
         boot_assert_file[sizeof(boot_assert_file) - 1U] = '\0';
         crash.magic = 0u;
+    }
+    if (fatal.magic == FATAL_MAGIC) {
+        boot_had_fatal = true;
+        boot_fatal_reason = fatal.reason;
+        boot_fatal_pc = fatal.pc;
+        boot_fatal_lr = fatal.lr;
+        fatal.magic = 0u;
     }
     /* print once logging is live, then repeat (see report_handler) */
     k_work_reschedule(&report_work, K_SECONDS(3));
