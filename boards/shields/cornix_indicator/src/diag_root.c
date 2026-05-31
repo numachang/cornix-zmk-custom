@@ -36,6 +36,7 @@
 #include <zephyr/drivers/watchdog.h>
 #include <zephyr/drivers/hwinfo.h>
 #include <zephyr/sys/reboot.h>
+#include <string.h>
 
 LOG_MODULE_REGISTER(diag_root, LOG_LEVEL_INF);
 
@@ -84,22 +85,50 @@ static void wdt_feed_handler(struct k_work *work) {
     k_work_reschedule(&wdt_feed_work, K_MSEC(WDT_TIMEOUT_MS / 4));
 }
 
-static int diag_root_init(void) {
-    uint32_t cause = 0;
-    (void)hwinfo_get_reset_cause(&cause);
-    (void)hwinfo_clear_reset_cause();
-    LOG_INF("=== DIAG ROOT boot. reset_cause=0x%08x [%s%s%s%s]", cause,
-            (cause & RESET_POR) ? "POR " : "", (cause & RESET_PIN) ? "PIN " : "",
-            (cause & RESET_SOFTWARE) ? "SOFT " : "",
-            (cause & RESET_WATCHDOG) ? "WDT " : "");
+/* The boot report (reset cause + any recorded LL_ASSERT) must NOT be logged from
+ * SYS_INIT: that runs before the USB CDC console is up, so those lines are
+ * dropped. Stash the values at init and have a delayable work re-print them a
+ * few times once logging is live, so Tera Term reliably catches them. */
+static uint32_t boot_cause;
+static bool boot_had_assert;
+static uint32_t boot_assert_line;
+static char boot_assert_file[sizeof(crash.file)];
+static int report_n;
 
-    if (crash.magic == CRASH_MAGIC) {
-        LOG_ERR(">>> PREV LL_ASSERT @ %s:%u <<< (controller invariant violated on central loss)",
-                crash.file, crash.line);
-        crash.magic = 0u;
-    } else if (cause & RESET_WATCHDOG) {
-        LOG_ERR(">>> PREV BOOT: WATCHDOG reset, NO LL_ASSERT recorded = silent hard hang (irq-locked) <<<");
+static void report_handler(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(report_work, report_handler);
+
+static void report_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+    LOG_INF("=== DIAG ROOT report #%d: prev reset_cause=0x%08x [%s%s%s%s] ===", report_n,
+            boot_cause, (boot_cause & RESET_POR) ? "POR " : "",
+            (boot_cause & RESET_PIN) ? "PIN " : "", (boot_cause & RESET_SOFTWARE) ? "SOFT " : "",
+            (boot_cause & RESET_WATCHDOG) ? "WDT " : "");
+    if (boot_had_assert) {
+        LOG_ERR(">>> PREV LL_ASSERT @ %s:%u <<< (controller invariant violated -- ROOT CAUSE)",
+                boot_assert_file, boot_assert_line);
+    } else if (boot_cause & RESET_WATCHDOG) {
+        LOG_ERR(">>> PREV BOOT: WATCHDOG reset, NO LL_ASSERT = silent hard hang (irq-locked) <<<");
+    } else {
+        LOG_INF("(prev boot was clean: no LL_ASSERT, no watchdog)");
     }
+    if (++report_n < 5) {
+        k_work_reschedule(&report_work, K_SECONDS(2));
+    }
+}
+
+static int diag_root_init(void) {
+    (void)hwinfo_get_reset_cause(&boot_cause);
+    (void)hwinfo_clear_reset_cause();
+    if (crash.magic == CRASH_MAGIC) {
+        boot_had_assert = true;
+        boot_assert_line = crash.line;
+        (void)strncpy(boot_assert_file, crash.file, sizeof(boot_assert_file) - 1U);
+        boot_assert_file[sizeof(boot_assert_file) - 1U] = '\0';
+        crash.magic = 0u;
+    }
+    /* print once logging is live, then repeat (see report_handler) */
+    k_work_reschedule(&report_work, K_SECONDS(3));
 
     if (!device_is_ready(wdt_dev)) {
         LOG_ERR("WDT device not ready; auto-recovery disabled");
