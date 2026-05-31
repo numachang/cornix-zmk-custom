@@ -9,11 +9,21 @@
         zmk,battery = &vbatt;
     };
 
+    /*
+     * DIAG (diag/battery-vddh-probe): switched from the external resistor-divider
+     * model to nRF52840's internal VDDHDIV5 (battery on VDDH, no external divider).
+     * Rationale: RMK source (the stock firmware framework, commit c68113c1 = cornix
+     * v1.11) defaults to battery_adc_pin = "vddh"; the previous divider config here
+     * (AIN3 + 2M/2.806M) is a copy of RMK's *commented-out* P0_04 alternative, with
+     * the wrong pin too. Leading-hypothesis fix to verify on hardware.
+     * Original (revert to restore):
+     *   compatible = "zmk,battery-voltage-divider";
+     *   io-channels = <&adc 3>;
+     *   output-ohms = <2000000>;
+     *   full-ohms = <(2000000 + 806000)>;
+     */
     vbatt: vbatt {
-        compatible = "zmk,battery-voltage-divider";
-        io-channels = <&adc 3>;
-        output-ohms = <2000000>;
-        full-ohms = <(2000000 + 806000)>;
+        compatible = "zmk,battery-nrf-vddh";
     };
 };
 

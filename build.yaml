@@ -30,8 +30,12 @@ include:
   #   artifact-name: cornix_dongle_zds_nano
   - board: cornix_left
     shield: cornix_indicator
-    snippet: studio-rpc-usb-uart nrf52840-nosd
-    artifact-name: cornix_left_default_nosd
+    # DIAG (diag/battery-vddh-probe): swapped studio-rpc-usb-uart -> zmk-usb-logging
+    # so the battery driver's mV reading prints over USB CDC (read in Tera Term).
+    # Studio is disabled on this diag build by design. Restore the line below to revert:
+    #   snippet: studio-rpc-usb-uart nrf52840-nosd
+    snippet: zmk-usb-logging nrf52840-nosd
+    artifact-name: cornix_left_vddhprobe_nosd
 
   # Dongle target disabled (see above).
   # - board: cornix_ph_left

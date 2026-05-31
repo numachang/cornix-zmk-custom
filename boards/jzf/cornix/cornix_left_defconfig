@@ -68,3 +68,11 @@ CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING=y
 CONFIG_ZMK_STUDIO=y
 CONFIG_ZMK_STUDIO_LOCKING=n
 CONFIG_ZMK_STUDIO_LOCK_ON_DISCONNECT=n
+
+# === DIAG (diag/battery-vddh-probe) ===
+# Show the nrf-vddh battery driver's mV reading over USB CDC (read in Tera Term).
+# The driver logs "...mV..." at DEBUG; raise the sensor subsystem log level so it
+# prints. Pair with the zmk-usb-logging snippet (set in build.yaml for cornix_left).
+# If the mV line still does not appear, bump CONFIG_LOG_DEFAULT_LEVEL=4 instead.
+# Remove this whole block to revert.
+CONFIG_SENSOR_LOG_LEVEL_DBG=y
