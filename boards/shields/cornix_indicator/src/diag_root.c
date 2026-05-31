@@ -69,7 +69,10 @@ void bt_ctlr_assert_handle(char *file, uint32_t line) {
     }
 }
 
-/* --- hardware watchdog: recover from a silent interrupt-locked hard hang --- */
+/* --- hardware watchdog: recover from a silent interrupt-locked hard hang.
+ * #if-guarded so the config bisect can build with WATCHDOG=n (assert sink only)
+ * to isolate which change suppresses the #14 freeze. --- */
+#if IS_ENABLED(CONFIG_WATCHDOG)
 #define WDT_TIMEOUT_MS 4000
 static const struct device *const wdt_dev = DEVICE_DT_GET(DT_NODELABEL(wdt0));
 static int wdt_ch = -1;
@@ -84,6 +87,7 @@ static void wdt_feed_handler(struct k_work *work) {
     }
     k_work_reschedule(&wdt_feed_work, K_MSEC(WDT_TIMEOUT_MS / 4));
 }
+#endif /* CONFIG_WATCHDOG */
 
 /* The boot report (reset cause + any recorded LL_ASSERT) must NOT be logged from
  * SYS_INIT: that runs before the USB CDC console is up, so those lines are
@@ -130,6 +134,7 @@ static int diag_root_init(void) {
     /* print once logging is live, then repeat (see report_handler) */
     k_work_reschedule(&report_work, K_SECONDS(3));
 
+#if IS_ENABLED(CONFIG_WATCHDOG)
     if (!device_is_ready(wdt_dev)) {
         LOG_ERR("WDT device not ready; auto-recovery disabled");
         return 0;
@@ -151,6 +156,9 @@ static int diag_root_init(void) {
     }
     k_work_reschedule(&wdt_feed_work, K_NO_WAIT);
     LOG_INF("WDT armed %d ms (fed every %d ms from system-wq)", WDT_TIMEOUT_MS, WDT_TIMEOUT_MS / 4);
+#else
+    LOG_INF("WDT disabled for this bisect build (assert sink only)");
+#endif /* CONFIG_WATCHDOG */
     return 0;
 }
 SYS_INIT(diag_root_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
