@@ -10,20 +10,21 @@
     };
 
     /*
-     * DIAG (diag/battery-vddh-probe): switched from the external resistor-divider
-     * model to nRF52840's internal VDDHDIV5 (battery on VDDH, no external divider).
-     * Rationale: RMK source (the stock firmware framework, commit c68113c1 = cornix
-     * v1.11) defaults to battery_adc_pin = "vddh"; the previous divider config here
-     * (AIN3 + 2M/2.806M) is a copy of RMK's *commented-out* P0_04 alternative, with
-     * the wrong pin too. Leading-hypothesis fix to verify on hardware.
-     * Original (revert to restore):
-     *   compatible = "zmk,battery-voltage-divider";
-     *   io-channels = <&adc 3>;
-     *   output-ohms = <2000000>;
-     *   full-ohms = <(2000000 + 806000)>;
+     * Battery = external resistor divider on AIN3 (P0.05).
+     *
+     * vddh (VDDHDIV5) was tested on hardware (diag/battery-vddh-probe) and is
+     * WRONG for this board: it read VDDH ~2.32 V => 0% both on USB and on
+     * battery. RMK's source default of battery_adc_pin = "vddh" is the generic
+     * example default and does NOT apply to the cornix; the cornix uses an
+     * external divider here, and this AIN3 + 2M/2.806M config is the one that
+     * actually produces a working reading. Do NOT switch this to
+     * zmk,battery-nrf-vddh.
      */
     vbatt: vbatt {
-        compatible = "zmk,battery-nrf-vddh";
+        compatible = "zmk,battery-voltage-divider";
+        io-channels = <&adc 3>;
+        output-ohms = <2000000>;
+        full-ohms = <(2000000 + 806000)>;
     };
 };
 
