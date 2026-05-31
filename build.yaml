@@ -36,7 +36,7 @@ include:
     # Restore the line below to revert:
     #   snippet: studio-rpc-usb-uart nrf52840-nosd
     snippet: zmk-usb-logging nrf52840-nosd
-    artifact-name: cornix_left_hb14c1_nosd
+    artifact-name: cornix_left_hb14c2_nosd
 
   # Dongle target disabled (see above).
   # - board: cornix_ph_left
@@ -50,7 +50,7 @@ include:
     # a USB CDC console. This is the half under study: watch its heartbeats after
     # the left central loses power. Restore by removing the snippet + override.
     snippet: zmk-usb-logging nrf52840-nosd
-    artifact-name: cornix_right_hb14c1_nosd
+    artifact-name: cornix_right_hb14c2_nosd
 
   - board: cornix_right
     shield: settings_reset
