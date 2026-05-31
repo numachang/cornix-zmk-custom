@@ -10,5 +10,5 @@
 # (The battery-probe census build used src/gpio_census.c here instead.)
 # To restore normal indicators, revert to:
 #   target_sources(app PRIVATE src/widget.c src/central.c src/peripheral.c src/charging.c)
-target_sources(app PRIVATE src/hb_probe.c)
+target_sources(app PRIVATE src/hb_probe.c src/diag_root.c)
 zephyr_include_directories(include)

@@ -16,4 +16,10 @@
     };
 };
 
+/* DIAG (diag/14-reconnect-heartbeat): enable the watchdog so src/diag_root.c can
+ * arm it for #14 auto-recovery from a silent interrupt-locked hard hang. */
+&wdt0 {
+    status = "okay";
+};
+
 //vim: set ft=dts:
