@@ -1,2 +1,11 @@
 config SHIELD_CORNIX_INDICATOR
 	def_bool $(shields_list_contains, cornix_indicator)
+
+# DIAG (diag/battery-vddh-probe): when y, the indicator shield drops its normal
+# indicators and instead probes the P0.01 charge-STAT GPIO on both halves
+# (src/charging_stat_probe.c). Enabled via cornix_indicator.conf on the diag
+# branch; default n so normal builds are unaffected.
+config CORNIX_RGB_STAT_PROBE
+	bool "DIAG: probe P0.01 charge-STAT pin instead of normal RGB indicators"
+	default n
+	depends on SHIELD_CORNIX_INDICATOR
