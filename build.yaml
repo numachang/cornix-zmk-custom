@@ -31,7 +31,7 @@ include:
   - board: cornix_left
     shield: cornix_indicator
     snippet: studio-rpc-usb-uart nrf52840-nosd
-    artifact-name: cornix_left_default_nosd
+    artifact-name: cornix_left_btctlr_nosd
 
   # Dongle target disabled (see above).
   # - board: cornix_ph_left
@@ -40,7 +40,7 @@ include:
 
   - board: cornix_right
     shield: cornix_indicator
-    artifact-name: cornix_right_nosd
+    artifact-name: cornix_right_btctlr_nosd
 
   - board: cornix_right
     shield: settings_reset
