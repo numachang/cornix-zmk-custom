@@ -257,6 +257,29 @@ just draw cornix     # keymap-drawer でキーマップ SVG を描画
 
 Windows ユーザーは GitHub Actions を利用してください。
 
+### Docker を使ったローカルビルド（CI と同一環境）
+
+`docker-build.sh` は、GitHub Actions が使っているのと同じコンテナイメージ
+（`zmkfirmware/zmk-build-arm:stable`）でビルドします。ツールチェーンが CI とずれないので、
+**CI が落ちた原因を手元で再現したいとき**はこちらを使ってください。必要なのは Docker だけです。
+
+```bash
+./docker-build.sh init          # 初回のみ: zmk + zephyr + modules を取得（約 3 GB）
+./docker-build.sh list          # build.yaml から解析したビルドターゲットを表示
+./docker-build.sh build         # 有効な全ターゲットをビルド
+./docker-build.sh build left    # 名前が "left" に一致するターゲットだけビルド
+./docker-build.sh update        # config/west.yml を変更した後に west update をやり直す
+./docker-build.sh shell         # ワークスペース内で対話シェルを開く
+./docker-build.sh clean         # ビルド成果物だけ削除（取得済みソースは残す）
+```
+
+生成された `.uf2` は `firmware/` に出力されます（`.gitignore` 済み）。
+
+west のワークスペースは**リポジトリの外**（既定で `~/zmk-workspace-cornix`、`ZMK_WORKSPACE` で変更可）
+に作られます。本リポジトリは自身の `zephyr/module.yml` を持つため、リポジトリ直下をワークスペースにすると
+`west update` が `<topdir>/zephyr` に clone する Zephyr ツリーと衝突するからです。CI も
+`zephyr/module.yml` がある場合は `$TMPDIR/zmk-config` を使って同じ回避をしています。
+
 ## RGB について
 
 Cornix シールドは片側に 2 個の RGB LED を備え、標準ファームウェアでは PWM で制御されています。ZMK では

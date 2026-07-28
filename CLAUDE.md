@@ -48,6 +48,25 @@ just test <path>     # run native_posix snapshot test under <path>
 ```
 The Justfile expects `ZMK_LIB_PREFIX` (defaults to `zmk_exts`) pointing to the parent of a checked-out `zmk/` tree. Windows users should rely on GH Actions instead.
 
+Two known Justfile hazards, unrelated to Docker: `config := absolute_path('config2')` points at a directory that does not exist in this repo (the real one is `config/`), and `_parse_combos` uses GNU `sed -Ei`, which breaks under macOS BSD sed.
+
+**Local build (Docker, mirrors CI exactly — `docker-build.sh`):**
+```
+./docker-build.sh init          # one-time: fetch zmk + zephyr + modules (~3 GB)
+./docker-build.sh list          # show build targets parsed from build.yaml
+./docker-build.sh build         # build every active target
+./docker-build.sh build left    # build only targets whose name matches "left"
+./docker-build.sh update        # re-run west update after config/west.yml churn
+./docker-build.sh shell         # interactive shell inside the workspace
+./docker-build.sh clean         # drop build outputs, keep fetched sources
+```
+Uses `zmkfirmware/zmk-build-arm:stable`, the same image ZMK's shared `build-user-config.yml` runs CI in, so the toolchain cannot drift from CI. Output `.uf2` files land in `firmware/`, which `.gitignore` excludes. Prefer this over the Nix path when reproducing a CI failure; the Nix path is the faster inner loop but its `flake.nix` pins `zephyr v3.7.0` + `sdk-0_16`, while `zmk@main` is now on Zephyr 4.1, so it needs updating before it will build.
+
+Three constraints are baked into the script, all hit for real while bringing it up. Preserve them:
+- **The west workspace lives outside the repo** (default `~/zmk-workspace-cornix`, override with `ZMK_WORKSPACE`). This repo ships its own `zephyr/module.yml`, so a workspace rooted here collides with the Zephyr tree `west update` clones into `<topdir>/zephyr`. CI avoids this the same way, by using `$TMPDIR/zmk-config` whenever `zephyr/module.yml` exists.
+- **`west zephyr-export` runs before every build, in the same container.** It writes the CMake package registry under `$HOME/.cmake` — `/root` here — which does not survive a `--rm` container. Skipping it fails with "Could not find a package configuration file provided by Zephyr". ZMK's own `.devcontainer` solves this by mounting a named volume at `/root`.
+- **git is forced onto HTTP/1.1.** The treeless clone CI uses (`--filter=tree:0`) fetches trees on demand at checkout, which reliably died against GitHub over HTTP/2 with `RPC failed; curl 92`.
+
 ## Code layout that matters
 
 - `build.yaml` — GH Actions matrix. Each `include:` entry is one firmware artifact. `board` + optional `shield` + optional `snippet` + `artifact-name`.
